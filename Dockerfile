@@ -2,16 +2,24 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Installed before copying app code so this layer is cached across rebuilds
-# that only change api/main.py, not requirements.txt.
+# Non-root user with UID 1000 for Hugging Face Spaces and container security
+RUN useradd -m -u 1000 user
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH \
+    PYTHONUNBUFFERED=1
+
+# Install serving dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Only what serving actually needs: the API code and the exported model.
-# No src/ (training-only), no data/, no mlruns/ -- keeps the image small
-# and means a broken training script can never break the deployed API.
-COPY api/ api/
-COPY artifacts/ artifacts/
+# Copy API serving code and exported champion model artifact
+COPY --chown=user:user api/ api/
+COPY --chown=user:user artifacts/ artifacts/
 
-EXPOSE 8000
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+USER user
+
+# Default port 7860 matches Hugging Face Spaces app_port, respects $PORT env var if provided (e.g. Render/Cloud Run)
+ENV PORT=7860
+EXPOSE 7860
+
+CMD ["sh", "-c", "uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-7860}"]

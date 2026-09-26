@@ -47,12 +47,10 @@ With ~74% of customers not churning, a model that always predicts "no churn" sco
 
 | Model | Accuracy | F1 | Recall | ROC-AUC |
 |---|---|---|---|---|
-| Logistic Regression (class-weighted) | — | — | — | — |
-| Random Forest (class-weighted) | — | — | — | — |
-| XGBoost (scale_pos_weight) | — | — | — | — |
-| PyTorch MLP (GPU, weighted loss) | — | — | — | — |
-
-*(Fill in from your MLflow comparison run before publishing — screenshot the MLflow UI table as a second reference.)*
+| Logistic Regression (class-weighted) | 74.2% | 0.6183 | 78.6% | 0.8411 |
+| Random Forest (class-weighted) | 76.9% | 0.6336 | 75.1% | 0.8415 |
+| XGBoost (scale_pos_weight) | 75.4% | 0.6249 | 77.3% | 0.8366 |
+| PyTorch MLP (GPU, weighted loss) | 74.2% | 0.6240 | 80.8% | 0.8426 |
 
 ## Tech stack
 
@@ -99,17 +97,18 @@ pip install -r requirements.txt
 python src/train.py
 mlflow ui   # view experiment comparisons at localhost:5000
 
-# Serve
-uvicorn api.main:app --reload
+# Serve (default port 7860 or customize with --port)
+uvicorn api.main:app --reload --port 7860
 ```
-Visit `http://localhost:8000/ui` for the form, `http://localhost:8000/docs` for the API.
+Visit `http://localhost:7860/ui` for the form, `http://localhost:7860/docs` for the API.
 
 ## Running with Docker
 
 ```bash
 docker build -t churn-mlops .
-docker run -p 8000:8000 churn-mlops
+docker run -p 7860:7860 churn-mlops
 ```
+*(Or specify `-e PORT=8000 -p 8000:8000` to run on port 8000)*
 
 ## Key design decisions
 

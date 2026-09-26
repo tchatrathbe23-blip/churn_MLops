@@ -2,10 +2,9 @@
 FastAPI serving for the trained churn model.
 
 Loads the exported champion pipeline from a plain joblib file (artifacts/),
-not from the MLflow registry. Render's deployed container can't reach the
-MLflow server running on your laptop, so the model has to travel as a file
-baked into the image instead -- see train.py's export step at the end of
-main() for where this file comes from.
+not from the MLflow registry. The model travels as a file baked into the image
+instead -- see train.py's export step at the end of main() for where this file
+comes from.
 """
 import json
 from pathlib import Path
@@ -13,11 +12,23 @@ from pathlib import Path
 import joblib
 import pandas as pd
 from fastapi import FastAPI
+from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-ARTIFACT_DIR = Path(__file__).resolve().parent.parent / "artifacts"
+BASE_DIR = Path(__file__).resolve().parent
+ARTIFACT_DIR = BASE_DIR.parent / "artifacts"
+STATIC_DIR = BASE_DIR / "static"
 
-app = FastAPI(title="Churn Prediction API")
+app = FastAPI(
+    title="Churn Prediction API",
+    description="Telecom customer churn prediction service with ML pipeline serving.",
+    version="1.0.0",
+)
+
+# Static UI files
+if STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # Loaded once at startup, reused for every request -- not reloaded per call.
 model = joblib.load(ARTIFACT_DIR / "champion_model.joblib")
@@ -46,6 +57,19 @@ class CustomerData(BaseModel):
     PaymentMethod: str
     MonthlyCharges: float
     TotalCharges: float
+
+
+@app.get("/", include_in_schema=False)
+def root():
+    """Redirect root to UI."""
+    return RedirectResponse(url="/ui")
+
+
+@app.get("/ui", include_in_schema=False)
+def ui():
+    """Serve the web prediction interface."""
+    index_file = STATIC_DIR / "index.html"
+    return FileResponse(index_file)
 
 
 @app.get("/health")

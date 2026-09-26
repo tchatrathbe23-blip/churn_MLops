@@ -16,6 +16,7 @@ guarantees:
      incoming data can never silently misalign features.
 """
 
+from pathlib import Path
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
@@ -27,15 +28,6 @@ NUMERIC_COLS = ["tenure", "MonthlyCharges", "TotalCharges", "SeniorCitizen"]
 # OneHotEncoder(drop="if_binary") handles 2-class columns as a single 0/1
 # column and multi-class columns as full one-hot -- one encoder, no need
 # to separately maintain LabelEncoders for binary columns.
-#
-# sparse_output=False is explicit on purpose: OneHotEncoder defaults to
-# sparse output, and a ColumnTransformer with mixed sparse/dense
-# transformers only densifies the combined result if the one-hot density
-# happens to clear sklearn's internal sparse_threshold (0.3). That's an
-# implicit, data-shape-dependent behavior. TorchMLPClassifier calls
-# np.asarray(X, dtype=np.float32) on whatever this returns, which breaks
-# silently on a sparse matrix, so we pin the output type instead of
-# depending on how sparse today's category counts happen to be.
 CATEGORICAL_COLS = [
     "gender", "Partner", "Dependents", "PhoneService", "PaperlessBilling",
     "MultipleLines", "InternetService", "OnlineSecurity", "OnlineBackup",
@@ -50,7 +42,26 @@ def load_data(path: str = "data/churn.csv") -> pd.DataFrame:
     """Load raw CSV and apply deterministic, distribution-independent
     cleaning only (safe to do before train/test split since it does not
     depend on any statistic of the data -- no leakage risk)."""
-    df = pd.read_csv(path)
+    file_path = Path(path)
+    if not file_path.exists():
+        candidates = [
+            Path(__file__).resolve().parent.parent / path,
+            Path("data/WA_Fn-UseC_-Telco-Customer-Churn.csv"),
+            Path(__file__).resolve().parent.parent / "data" / "WA_Fn-UseC_-Telco-Customer-Churn.csv",
+            Path("data/archive.zip"),
+            Path(__file__).resolve().parent.parent / "data" / "archive.zip",
+        ]
+        found = None
+        for cand in candidates:
+            if cand.exists():
+                found = cand
+                break
+        if found is not None:
+            file_path = found
+        else:
+            raise FileNotFoundError(f"Could not locate dataset at '{path}' or candidate fallback locations.")
+
+    df = pd.read_csv(file_path)
     df.columns = df.columns.str.strip()  # guard against stray whitespace
 
     if "customerID" in df.columns:
